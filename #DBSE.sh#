@@ -1,0 +1,78 @@
+#!/bin/bash
+
+
+progname=DetectBeadSynthesisErrors
+
+
+USAGE=$(cat << EOF
+USAGE: $0 [-m <xmx> -i <in> -o <out> -n <num_bc> -p <pa>] 
+       -m <xmx> (default $xmx)
+       -i <in> input .bam file (Required)
+       -o <out>  output directory (Required)
+       -p <pa> program args supplied as a comma separated string
+		e.g. ARGUMENT1=VALUE1,ARGUMENT2=VALUE2
+       -n <num_bc> number barcodes (2X input cells roughly)
+       -j <jar_deploy_dir> java deploy directory (absolute path required if running on a cluster)
+    
+To get help for the program rather than the script:
+   $programe -- -h
+EOF
+)
+
+function error_exit
+{
+    echo "$1" 1>&2
+    exit 1
+}
+
+function usage () {
+    echo "$USAGE" >&2
+}
+
+function check_set() {
+    value=$1
+    name=$2
+    flag=$3
+    if [ -z "$value" ]
+    then error_exit "$name has not been specified.  $flag flag is required"
+    fi
+}
+
+set -e
+
+while getopts ":m:i:o:n:ep:" options; do
+  case $options in
+    m ) xmx=$OPTARG;;
+    i ) in=$OPTARG;;
+    o ) out=$OPTARG;;
+    n ) num_bc=$OPTARG;;
+    e ) echo_prefix="echo";;
+    p ) pa=$OPTARG;;
+    h ) usage
+          exit 1;;
+    \? ) usage
+         exit 1;;
+    * ) usage
+          exit 1;;
+
+  esac
+done
+shift $(($OPTIND - 1))
+
+check_set "$in" "Input BAM"  "-i"
+check_set "$out" "Output Directory" "-o"
+check_set "$num_bc" "Number barcodes" "-n"
+
+if [ -z "$xmx" ]
+then xmx=4g
+fi
+
+if [ -z "jar_deploy_dir" ]
+then jar_deploy_dir=`dirname $0`/jar
+fi
+
+command="$echo_prefix java -Xmx${xmx} -jar $jar_deploy_dir/dropseq.jar $progname INPUT=$in O=$out/clean.bam OUTPUT_STATS=$out/DBSE_stats.txt SUMMARY=$out/DBSE_summary.txt NUM_BARCODES=$num_bc"
+
+$command
+#echo $*
+#echo xmx=$xmx in=$in out=$out num_bc=$num_bc pa=$pa echo_p=$echo_prefix

@@ -1,0 +1,74 @@
+#!/bin/bash
+
+
+progname=BAMTagHistogram
+
+USAGE=$(cat << EOF
+USAGE: $0 [-m <xmx> i <in> -o <out> -p <pa>]
+       -m <jvm_heap_size> (default 4g)
+       -i <in> input.bam (Required)
+       -o <output_file> output file (Required)
+       -p <pa> program args supplied as a comma separated string
+                e.g. ARGUMENT1=VALUE1,ARGUMENT2=VALUE2
+       -j <jar_deploy_dir> java deploy directory (absolute path required if running on a cluster)
+To get help for the program rather than the script:
+   $progname -- -h
+EOF
+)
+
+function error_exit
+{
+    echo "$1" 1>&2
+    exit 1
+}
+
+function usage () {
+    echo "$USAGE" >&2
+}
+
+function check_set() {
+    value=$1
+    name=$2
+    flag=$3
+    if [ -z "$value" ]
+    then error_exit "$name has not been specified.  $flag flag is required"
+    fi
+}
+
+set -e
+
+while getopts ":m:" options; do
+  case $options in
+    m ) xmx=$OPTARG;;
+    i ) in=$OPTARG;;
+    o ) output_file=$OPTARG;;
+    e ) echo_prefix="echo";;
+    p ) pa=$OPTARG;;
+    h ) usage
+          exit 1;;
+    \? ) usage
+         exit 1;;
+    * ) usage
+          exit 1;;
+
+  esac
+done
+shift $(($OPTIND - 1))
+
+check_set "$in" "Input BAM"  "-i"
+check_set "$output_file" "Output File" "-o"
+
+if [ -z "$xmx" ]
+then xmx=4g
+fi
+
+if [ -z "jar_deploy_dir" ]
+then jar_deploy_dir=`dirname $0`/jar
+fi
+
+
+command="$echo_prefix java -Xmx${xmx} -jar $jar_deploy_dir/dropseq.jar $progname INPUT=$in O=$output_file OUTPUT_STATS=$out TAG=XC"
+
+$command
+
+#java -Xmx${xmx} -jar $jar_deploy_dir/dropseq.jar $progname $*
